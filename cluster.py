@@ -20,10 +20,10 @@ class Cluster:
         adiabatic_idx = 5 / 3
 
     def __init__(
-            self, radius, mass, vel_disp, t_c=1 * u.Gyr, accretion=1e-7 * const.M_sun / u.s,
-            epsilon=0.01, fb=0.1, fdm=0.9, m500=None, v500=None):
+            self, radius, mass, vel_disp, 
+            epsilon=0.01, fb=0.1, fdm=0.9, m500=None, v500=0*u.km/u.s):
         with u.set_enabled_equivalencies(u.mass_energy()):
-            # General - from data
+            # General - read from data
             self.radius = radius  # radius
             self.mass = mass.to(u.GeV)  # total mass
             self.vel_disp = vel_disp  # velocity dispersion
@@ -37,16 +37,13 @@ class Cluster:
 
             # AGN heating params
             self.m500 = m500
-            self.accretion = accretion  # accretion rate
             self.epsilon = epsilon  # efficiency
 
             # radiative cooling params
             self.n_e = self.rho_b / self.m_b  # number density of electrons
-            self.t_c = t_c.to(u.s)  # cooling time
 
             # to calculate luminosity
-            self.v500 = v500
-            self.T500 = temp_from_vdisp(self.v500) if v500 is not None else None
+            self.v500 = v500 # default 0 gives no cooling
 
     def agn_heating_rate(self):
         with u.set_enabled_equivalencies(u.mass_energy()):
@@ -55,7 +52,6 @@ class Cluster:
 
     def accretion_rate(self):
         with u.set_enabled_equivalencies(u.mass_energy()):
-            # G = const.G.to(u.cm**3 * u.GeV**(-1) * u.s**(-2), equivalencies=u.mass_energy())
             norm = 1 / 4  # normalization factor of order 1, norm(adiabatic_idx=5/3)=1/4
             mu = 1  # mean molecular weight of gas, 1 for proton gas (hydrogen)
             leading_factors = norm * 4*np.pi *const.c ** -5
@@ -80,10 +76,10 @@ class Cluster:
 
     def radiative_cooling_rate(self):
         with u.set_enabled_equivalencies(u.mass_energy()):
-            return (3 / 2 * self.n_e * self.baryon_temp / self.t_c * self.volume).to(u.GeV / u.s)
+            return (3 / 2 * self.n_e * self.baryon_temp / self.cooling_time() * self.volume).to(u.GeV / u.s)
 
     def luminosity(self):
-        T = self.T500.to(u.K, equivalencies=u.temperature_energy())
+        T = temp_from_vdisp(self.v500).to(u.K, equivalencies=u.temperature_energy())
         b = -2.34 * 1e44 * u.erg / u.s
         m = (4.71 * 1e44 * u.erg / u.s) / u.K
         L = m * T + b
@@ -106,14 +102,14 @@ class Cluster:
             sigma0 = (numerator / denominator).to(u.cm ** 2)
             return sigma0
 
-    def plot_T_chi_vs_m_chi(self, f_chi=1, m_psi=0.1 * u.GeV):
+    def plot_T_chi_vs_m_chi(self, f_chi=1, m_psi=0.1 * u.GeV): # produces T_chi vs m_chi plot given an f_chi and m_psi
         plt.loglog(self.m_chi, self.virial_temperature(f_chi=f_chi, m_psi=m_psi),
                    label=f'DM temp = virial temp, fx={f_chi}')
         plt.xlabel(r'$m_{\chi} (GeV)$')
         plt.ylabel(r'$T_{\chi} (GeV)$')
         plt.legend(loc='upper left')
 
-    def plot_sigma0_vs_m_chi(self, f_chi=[1], m_psi=[0.1 * u.GeV], n=[0]):
+    def plot_sigma0_vs_m_chi(self, f_chi=[1], m_psi=[0.1 * u.GeV], n=[0]): # plots sigma0 vs m_chi for all combinations of f_chi, m_psi, and n
         params = [(f, m, i) for f in f_chi for m in m_psi for i in n]
         for (f, m, i) in params:
             plt.loglog(self.m_chi, self.sigma0(f_chi=f, m_psi=m, n=i),
