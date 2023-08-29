@@ -47,14 +47,14 @@ class Cluster:
 
     def agn_heating_rate(self):
         with u.set_enabled_equivalencies(u.mass_energy()):
-            return (self.epsilon * self.accretion_rate() * const.c ** 2).to(u.GeV / u.s,
+            return (self.epsilon * self.accretion_rate()).to(u.GeV / u.s,
                                                                              equivalencies=u.temperature_energy())
 
     def accretion_rate(self):
         with u.set_enabled_equivalencies(u.mass_energy()):
             norm = 1 / 4  # normalization factor of order 1, norm(adiabatic_idx=5/3)=1/4
             mu = 1  # mean molecular weight of gas, 1 for proton gas (hydrogen)
-            leading_factors = norm * 4*np.pi *const.c ** -5
+            leading_factors = norm * 4*np.pi *const.c ** -3
             gm2 = (const.G * self.bh_mass()) ** 2
             frac = (mu * self.m_b) ** (5 / 2) / self.adiabatic_idx ** (3 / 2)
             return leading_factors * gm2 * frac * self.plasma_entropy() ** (-3 / 2)
