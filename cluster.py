@@ -97,8 +97,7 @@ class Cluster:
             rho_chi = self.rho_dm * f_chi
             total_heating_rate = self.agn_heating_rate() - self.radiative_cooling_rate()
             numerator = total_heating_rate * (self.m_chi + self.m_b) ** 2
-            denominator = 3 * (self.baryon_temp - dm_temp) * rho_chi * self.rho_b * self.volume * c(n) * uth ** (
-                    (n + 1) / 2) * const.c.to(u.cm / u.s)
+            denominator = 3 * (self.baryon_temp - dm_temp) * rho_chi * self.rho_b * self.volume * c(n) * uth ** (n + 1) * const.c.to(u.cm / u.s)
             sigma0 = (numerator / denominator).to(u.cm ** 2)
             return sigma0
 
