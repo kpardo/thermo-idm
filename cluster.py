@@ -59,7 +59,7 @@ class Cluster:
             frac = (mu * self.m_b) ** (5 / 2) / self.adiabatic_idx ** (3 / 2)
             return leading_factors * gm2 * frac * self.plasma_entropy() ** (-3 / 2)
 
-    def bh_mass(self):  # from Gaspari 2019 table 8
+    def bh_mass(self):  # from Gaspari 2019 figure 8
         slope = 1.39
         intercept = -9.56 * u.Msun
         return (slope * self.m500 + intercept).to(u.kg)
@@ -70,15 +70,17 @@ class Cluster:
                 self.adiabatic_idx - 1)
 
     def cooling_time(self):
+        # THIS IS NOT A VALID WAY OF CALCULATING COOLING TIME
         t_c = (3 * const.k_B * self.n_e * self.volume * self.baryon_temp.to(
             u.K, equivalencies=u.temperature_energy())) / (2 * (self.luminosity()).to(u.J / u.s))
         return t_c.to(u.s)
 
     def radiative_cooling_rate(self):
         with u.set_enabled_equivalencies(u.mass_energy()):
-            return (3 / 2 * self.n_e * self.baryon_temp / self.cooling_time() * self.volume).to(u.GeV / u.s)
+            #return (3 / 2 * self.n_e * self.baryon_temp / self.cooling_time() * self.volume).to(u.GeV / u.s)
+            return 0 # NO RADIATIVE COOlING RIGHT NOW UNTIL I FIND A BETTER WAY TO CALCULATE
 
-    def luminosity(self):
+    def luminosity(self): # from Gaspari 2019 figure A1 
         T = temp_from_vdisp(self.v500).to(u.K, equivalencies=u.temperature_energy())
         b = -2.34 * 1e44 * u.erg / u.s
         m = (4.71 * 1e44 * u.erg / u.s) / u.K
@@ -108,11 +110,19 @@ class Cluster:
         plt.ylabel(r'$T_{\chi} (GeV)$')
         plt.legend(loc='upper left')
 
-    def plot_sigma0_vs_m_chi(self, f_chi=[1], m_psi=[0.1 * u.GeV], n=[0]): # plots sigma0 vs m_chi for all combinations of f_chi, m_psi, and n
+    def plot_sigma0_vs_m_chi(self, f_chi=[1], m_psi=[0.1 * u.GeV], n=[0], region=False): 
+        # plots sigma0 vs m_chi for all combinations of f_chi, m_psi, and n
         params = [(f, m, i) for f in f_chi for m in m_psi for i in n]
         for (f, m, i) in params:
-            plt.loglog(self.m_chi, self.sigma0(f_chi=f, m_psi=m, n=i),
-                       label=f'fx={f}, n={i}, m_psi={m}')
+            sigma0 = self.sigma0(f_chi=f, m_psi=m, n=i)
+            label = f'fx={f}, n={i}' 
+            label = label + f', m_psi={m}' if f<1 else label
+            plt.loglog(self.m_chi, sigma0,
+                       label=label)
+            if region:
+                plt.fill_between(self.m_chi.value, sigma0.value, y2=1e-15, alpha=0.3)
+
+
         plt.xlabel(r'$m_{\chi} (GeV)$')
         plt.ylabel(r'$\sigma_0 (cm^2)$')
         plt.legend(loc='upper left')
