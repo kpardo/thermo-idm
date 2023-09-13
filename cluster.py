@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 from astropy import units as u
 from astropy import constants as const
 from scipy.special import gamma
+from scipy.optimize import fsolve
 
 
 def c(n):
@@ -11,13 +12,35 @@ def c(n):
 
 def temp_from_vdisp(vel_disp):
     return (vel_disp ** 2 * const.m_p / const.k_B).to(u.GeV, equivalencies=u.temperature_energy())
-
+    
+def func(T_b, p0, cluster):
+    #function used to solve for T_b
+    sigma0 = p0[0]*u.cm**2
+    m_chi=p0[1]*u.GeV
+    T_b = T_b*u.GeV
+    
+    V=cluster.volume.to(u.cm**3)
+    x = (3*const.c*c(n)*V*cluster.rho_dm*cluster.rho_b*sigma0/(cluster.m_b+m_chi)**2).to(1/u.s)
+    gm2 = ((const.G * cluster.bh_mass()) ** 2).to(u.cm**6/u.s**4)
+    frac = ((cluster.mu * cluster.m_b) ** (5 / 2) / cluster.adiabatic_idx ** (3 / 2)).to(u.GeV**(5/2))
+    nb = (2 * cluster.n_e).to(u.cm ** (-3)) # baryon number density
+    D = (cluster.epsilon*cluster.leading_factors*gm2*frac*(1/nb**(2/3))**(-3/2)) # removed k_B from original function because we are working in GeV here
+    T_chi = cluster.virial_temperature(m_chi)
+    
+    numerator = D*T_b**(-3/2)
+    denominator = (T_b - T_chi)*(T_chi/m_chi + T_b/cluster.m_b)**(1/2)
+    
+    return ((numerator/denominator - x)*const.hbar).to(u.GeV, equivalencies=u.temperature_energy())
+    
+    
 
 class Cluster:
     with u.set_enabled_equivalencies(u.mass_energy()):
         m_b = const.m_p.to(u.GeV)  # baryon particle mass
         m_chi = np.logspace(-5, 3, num=100) * u.GeV
         adiabatic_idx = 5 / 3
+        norm = 1 / 4 # accretion rate normalization factor of order 1, norm(adiabatic_idx=5/3)=1/4
+        mu = 1  # mean molecular weight of gas, 1 for proton gas (hydrogen)
 
     def __init__(
             self, radius, mass, vel_disp, 
@@ -52,11 +75,9 @@ class Cluster:
 
     def accretion_rate(self):
         with u.set_enabled_equivalencies(u.mass_energy()):
-            norm = 1 / 4  # normalization factor of order 1, norm(adiabatic_idx=5/3)=1/4
-            mu = 1  # mean molecular weight of gas, 1 for proton gas (hydrogen)
-            leading_factors = norm * 4*np.pi *const.c ** -3
+            leading_factors = self.norm * 4*np.pi *const.c ** -3
             gm2 = (const.G * self.bh_mass()) ** 2
-            frac = (mu * self.m_b) ** (5 / 2) / self.adiabatic_idx ** (3 / 2)
+            frac = (self.mu * self.m_b) ** (5 / 2) / self.adiabatic_idx ** (3 / 2)
             return leading_factors * gm2 * frac * self.plasma_entropy() ** (-3 / 2)
 
     def bh_mass(self):  # from Gaspari 2019 figure 8
@@ -87,14 +108,14 @@ class Cluster:
         L = m * T + b
         return L.to(u.GeV / u.s)
 
-    def virial_temperature(self, f_chi=1, m_psi=0.1 * u.GeV):
-        frac = (f_chi / self.m_chi + (1 - f_chi) / m_psi)
+    def virial_temperature(self, m_chi, f_chi=1, m_psi=0.1 * u.GeV):
+        frac = (f_chi / m_chi + (1 - f_chi) / m_psi)
         M_kg = self.mass.to(u.kg, equivalencies=u.mass_energy())
         return (0.3 * const.G * M_kg / (self.radius * frac) * 1 / const.c ** 2).to(u.GeV)
 
     def sigma0(self, f_chi=1, m_psi=0.1 * u.GeV, n=0):
         with u.set_enabled_equivalencies(u.mass_energy()):
-            dm_temp = self.virial_temperature(f_chi=f_chi, m_psi=m_psi)
+            dm_temp = self.virial_temperature(self.m_chi, f_chi=f_chi, m_psi=m_psi)
             uth = np.sqrt(self.baryon_temp / self.m_b + dm_temp / self.m_chi)
             rho_chi = self.rho_dm * f_chi
             total_heating_rate = self.agn_heating_rate() - self.radiative_cooling_rate()
@@ -104,7 +125,7 @@ class Cluster:
             return sigma0
 
     def plot_T_chi_vs_m_chi(self, f_chi=1, m_psi=0.1 * u.GeV): # produces T_chi vs m_chi plot given an f_chi and m_psi
-        plt.loglog(self.m_chi, self.virial_temperature(f_chi=f_chi, m_psi=m_psi),
+        plt.loglog(self.m_chi, self.virial_temperature(self.m_chi, f_chi=f_chi, m_psi=m_psi),
                    label=f'DM temp = virial temp, fx={f_chi}')
         plt.xlabel(r'$m_{\chi} (GeV)$')
         plt.ylabel(r'$T_{\chi} (GeV)$')
@@ -126,3 +147,20 @@ class Cluster:
         plt.xlabel(r'$m_{\chi} (GeV)$')
         plt.ylabel(r'$\sigma_0 (cm^2)$')
         plt.legend(loc='upper left')
+
+#model testing methods:
+    def pred_T_b_small_m(self, sigma0, m_chi):
+        # approximates T_b for small m_chi -> T_chi~0
+        V=self.volume.to(u.cm**3)
+        x = (3*const.c*c(n)*V*self.rho_dm*self.rho_b*sigma0/(self.m_b+m_chi)**2).to(1/u.s)
+        leading_factors = (self * 4*np.pi *const.c ** -3).to(u.s**3/u.cm**3)
+        gm2 = ((const.G * self.bh_mass()) ** 2).to(u.cm**6/u.s**4)
+        frac = ((self.mu * self.m_b) ** (5 / 2) / self.adiabatic_idx ** (3 / 2)).to(u.GeV**(5/2))
+        nb = (2 * self.n_e).to(u.cm ** (-3)) # baryon number density
+        D = (self.epsilon*leading_factors*gm2*frac*(1/nb**(2/3))**(-3/2)) # removed k_B from original function because we are working in GeV here
+        T_b = (((D*np.sqrt(self.m_b))/x)**(1/3)).to(u.GeV, equivalencies=u.temperature_energy())
+        return T_b
+
+    def pred_T_b(self, p0): #p0 is a vector with p0[0] = log(sigma0) and p0[1]=log(m_chi)
+        x0 = 1e-6 * u.GeV # starting estimate (could even do this using T_b_small)
+        return fsolve(func, x0, args=(p0, self))*u.GeV
