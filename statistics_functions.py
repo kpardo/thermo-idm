@@ -1,5 +1,4 @@
 import numpy as np
-from cluster import Cluster
 
 
 def chi_squared(T_model, T_data, variance): # take lists of model prediction, data, and variance of same length
