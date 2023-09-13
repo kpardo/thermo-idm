@@ -2,8 +2,12 @@ import pandas as pd
 from astropy import units as u
 from astropy.table import QTable
 
-from cluster import Cluster
+from cluster import Cluster, temp_from_vdisp
 
+def galweight_variance(err_neg, err_pos):
+    n_temp = temp_from_vdisp(err_neg)
+    p_temp = temp_from_vdisp(err_pos)
+    return n_temp + p_temp
 
 def load_galweight_clusters(nrows=None):
     # given an integer nrows, returns nrows Clusters generated from GalWeight cluster dataset
