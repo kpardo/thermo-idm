@@ -4,12 +4,12 @@ from astropy.table import QTable
 
 from cluster import Cluster, temp_from_vdisp
 
-def galweight_variance(err_neg, err_pos):
+def variance(err_neg, err_pos):
     n_temp = temp_from_vdisp(err_neg)
     p_temp = temp_from_vdisp(err_pos)
     return n_temp + p_temp
 
-def load_galweight_clusters(nrows=None):
+def load_clusters(nrows=None):
     # given an integer nrows, returns nrows Clusters generated from GalWeight cluster dataset
     galwcls=pd.read_csv('data/galwcls.dat', sep='|', header=None, nrows=nrows)
     cls_data = {'sig500': galwcls[:][8],
@@ -30,4 +30,5 @@ def load_galweight_clusters(nrows=None):
 
 
     clusters = [Cluster(cls_table['r200'][i], cls_table['M200'][i], cls_table['sig200'][i], m500=cls_table['M500'][i]) for i in range(galwcls.shape[0])]
-    return clusters
+    variances = variance(cls_table['err_neg'], cls_table['err_pos'])
+    return clusters, variances

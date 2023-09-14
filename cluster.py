@@ -13,18 +13,20 @@ def c(n):
 def temp_from_vdisp(vel_disp):
     return (vel_disp ** 2 * const.m_p / const.k_B).to(u.GeV, equivalencies=u.temperature_energy())
     
-def func(T_b, p0, cluster):
+def func(T_b, p0, cluster, n=0):
     #function used to solve for T_b
     sigma0 = p0[0]*u.cm**2
     m_chi=p0[1]*u.GeV
     T_b = T_b*u.GeV
+
+    leading_factors = (cluster.norm * 4*np.pi *const.c ** -3).to(u.s**3/u.cm**3)
     
     V=cluster.volume.to(u.cm**3)
     x = (3*const.c*c(n)*V*cluster.rho_dm*cluster.rho_b*sigma0/(cluster.m_b+m_chi)**2).to(1/u.s)
     gm2 = ((const.G * cluster.bh_mass()) ** 2).to(u.cm**6/u.s**4)
     frac = ((cluster.mu * cluster.m_b) ** (5 / 2) / cluster.adiabatic_idx ** (3 / 2)).to(u.GeV**(5/2))
     nb = (2 * cluster.n_e).to(u.cm ** (-3)) # baryon number density
-    D = (cluster.epsilon*cluster.leading_factors*gm2*frac*(1/nb**(2/3))**(-3/2)) # removed k_B from original function because we are working in GeV here
+    D = (cluster.epsilon*leading_factors*gm2*frac*(1/nb**(2/3))**(-3/2)) # removed k_B from original function because we are working in GeV here
     T_chi = cluster.virial_temperature(m_chi)
     
     numerator = D*T_b**(-3/2)
@@ -149,11 +151,11 @@ class Cluster:
         plt.legend(loc='upper left')
 
 #model testing methods:
-    def pred_T_b_small_m(self, sigma0, m_chi):
+    def pred_T_b_small_m(self, sigma0, m_chi, n=0):
         # approximates T_b for small m_chi -> T_chi~0
         V=self.volume.to(u.cm**3)
         x = (3*const.c*c(n)*V*self.rho_dm*self.rho_b*sigma0/(self.m_b+m_chi)**2).to(1/u.s)
-        leading_factors = (self * 4*np.pi *const.c ** -3).to(u.s**3/u.cm**3)
+        leading_factors = (self.norm * 4*np.pi *const.c ** -3).to(u.s**3/u.cm**3)
         gm2 = ((const.G * self.bh_mass()) ** 2).to(u.cm**6/u.s**4)
         frac = ((self.mu * self.m_b) ** (5 / 2) / self.adiabatic_idx ** (3 / 2)).to(u.GeV**(5/2))
         nb = (2 * self.n_e).to(u.cm ** (-3)) # baryon number density
