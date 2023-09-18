@@ -65,7 +65,7 @@ def fun(T_b, cluster, p0, f_chi=1, n=0):
     cooling_factors=3*rho_chi*rho_b*V*c(n)*const.c 
 
     B=(efficiency*accretion_factors*plasma_entropy_factors)/(cooling_factors)
-    
+
     other_c = ((B * (m_chi + m_b)**2)/(sigma0) *(1/const.c**3)).to(u.GeV**(5/2))
     return (T_b-T_chi)*(T_chi/m_chi + T_b/m_b)**(1/2) * T_b**(3/2) - other_c
     
