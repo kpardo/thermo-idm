@@ -12,9 +12,12 @@ def c(n):
 
 def temp_from_vdisp(vel_disp):
     return (vel_disp ** 2 * const.m_p / const.k_B).to(u.GeV, equivalencies=u.temperature_energy())
-    
+
+def temp_from_luminosity(luminosity):
+    return    
+
 def func(T_b, p0, cluster, n=0):
-    #function used to solve for T_b
+    #function used to solve for T_b (wrong)
     sigma0 = p0[0]*u.cm**2
     m_chi=p0[1]*u.GeV
     T_b = T_b*u.GeV
@@ -45,20 +48,23 @@ class Cluster:
         mu = 1  # mean molecular weight of gas, 1 for proton gas (hydrogen)
 
     def __init__(
-            self, radius, mass, vel_disp, 
+            self, radius, mass, vel_disp=None, L500=None,
             epsilon=0.01, fb=0.1, fdm=0.9, m500=None, v500=0*u.km/u.s):
         with u.set_enabled_equivalencies(u.mass_energy()):
             # General - read from data
             self.radius = radius  # radius
             self.mass = mass.to(u.GeV)  # total mass
-            self.vel_disp = vel_disp  # velocity dispersion
+            #self.vel_disp = vel_disp  # velocity dispersion
 
             # General - calculated
             self.volume = 4 / 3 * np.pi * self.radius ** 3  # cluster volume
             self.rho_tot = (self.mass / self.volume).to(u.GeV / u.cm ** 3)  # total density
             self.rho_b = self.rho_tot * fb  # baryon density
             self.rho_dm = self.rho_tot * fdm  # DM density
-            self.baryon_temp = temp_from_vdisp(self.vel_disp)  # baryon temperature
+            if vel_disp:
+                self.baryon_temp = temp_from_vdisp(vel_disp)  # baryon temperature
+            elif L500:
+                self.baryon_temp = temp_from_luminosity(L500)
 
             # AGN heating params
             self.m500 = m500
@@ -151,8 +157,9 @@ class Cluster:
         plt.legend(loc='upper left')
 
 #model testing methods:
-    def pred_T_b_small_m(self, sigma0, m_chi, n=0):
+    def pred_T_b_small_m(self, p0, m_chi, n=0):
         # approximates T_b for small m_chi -> T_chi~0
+        sigma0=10**p0*u.cm**2
         V=self.volume.to(u.cm**3)
         x = (3*const.c*c(n)*V*self.rho_dm*self.rho_b*sigma0/(self.m_b+m_chi)**2).to(1/u.s)
         leading_factors = (self.norm * 4*np.pi *const.c ** -3).to(u.s**3/u.cm**3)
