@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 from astropy import units as u
 from astropy import constants as const
 from scipy.special import gamma
-from scipy.optimize import fsolve
+from scipy.optimize import root
 
 
 def c(n):
@@ -19,27 +19,55 @@ def temp_from_luminosity(luminosity):
     T=np.power(10, log_T) * u.keV
     return T.to(u.GeV) 
 
-def func(T_b, p0, cluster, n=0):
-    #function used to solve for T_b (wrong)
-    sigma0 = p0[0]*u.cm**2
-    m_chi=p0[1]*u.GeV
-    T_b = T_b*u.GeV
+# def func(T_b, p0, cluster, n=0):
+#     #function used to solve for T_b (wrong)
+#     sigma0 = p0[0]*u.cm**2
+#     m_chi=p0[1]*u.GeV
+#     T_b = T_b*u.GeV
 
-    leading_factors = (cluster.norm * 4*np.pi *const.c ** -3).to(u.s**3/u.cm**3)
+#     leading_factors = (cluster.norm * 4*np.pi *const.c ** -3).to(u.s**3/u.cm**3)
     
-    V=cluster.volume.to(u.cm**3)
-    x = (3*const.c*c(n)*V*cluster.rho_dm*cluster.rho_b*sigma0/(cluster.m_b+m_chi)**2).to(1/u.s)
-    gm2 = ((const.G * cluster.bh_mass()) ** 2).to(u.cm**6/u.s**4)
-    frac = ((cluster.mu * cluster.m_b) ** (5 / 2) / cluster.adiabatic_idx ** (3 / 2)).to(u.GeV**(5/2))
-    nb = (2 * cluster.n_e).to(u.cm ** (-3)) # baryon number density
-    D = (cluster.epsilon*leading_factors*gm2*frac*(1/nb**(2/3))**(-3/2)) # removed k_B from original function because we are working in GeV here
+#     V=cluster.volume.to(u.cm**3)
+#     x = (3*const.c*c(n)*V*cluster.rho_dm*cluster.rho_b*sigma0/(cluster.m_b+m_chi)**2).to(1/u.s)
+#     gm2 = ((const.G * cluster.bh_mass()) ** 2).to(u.cm**6/u.s**4)
+#     frac = ((cluster.mu * cluster.m_b) ** (5 / 2) / cluster.adiabatic_idx ** (3 / 2)).to(u.GeV**(5/2))
+#     nb = (2 * cluster.n_e).to(u.cm ** (-3)) # baryon number density
+#     D = (cluster.epsilon*leading_factors*gm2*frac*(1/nb**(2/3))**(-3/2)) # removed k_B from original function because we are working in GeV here
+#     T_chi = cluster.virial_temperature(m_chi)
+    
+#     numerator = D*T_b**(-3/2)
+#     denominator = (T_b - T_chi)*(T_chi/m_chi + T_b/cluster.m_b)**(1/2)
+    
+#     return ((numerator/denominator - x)*const.hbar).to(u.GeV, equivalencies=u.temperature_energy())
+
+
+def fun(T_b, cluster, p0, f_chi=1, n=0):
+    T_b=T_b*u.GeV
+
+    sigma0=np.float_power(10, p0[0])*u.cm**2
+    m_chi = np.float_power(10, p0[1])*u.GeV
+
+    norm=cluster.norm
+    bh_mass=cluster.bh_mass()
+    mu=cluster.mu
+    m_b=cluster.m_b
+    nb=(2 * cluster.n_e).to(u.m ** (-3))
+    gamma=cluster.adiabatic_idx
+    rho_chi=cluster.rho_dm * f_chi
+    rho_b = cluster.rho_b
+    V=cluster.volume
+    efficiency=cluster.epsilon
     T_chi = cluster.virial_temperature(m_chi)
+
+
+    accretion_factors=(norm*4*np.pi*(const.G*bh_mass)**2)
+    plasma_entropy_factors=(((mu*m_b)**(5/2)*nb)/gamma**(3/2)) #no k_b because T_b in GeV
+    cooling_factors=3*rho_chi*rho_b*V*c(n)*const.c 
+
+    B=(efficiency*accretion_factors*plasma_entropy_factors)/(cooling_factors)
     
-    numerator = D*T_b**(-3/2)
-    denominator = (T_b - T_chi)*(T_chi/m_chi + T_b/cluster.m_b)**(1/2)
-    
-    return ((numerator/denominator - x)*const.hbar).to(u.GeV, equivalencies=u.temperature_energy())
-    
+    other_c = ((B * (m_chi + m_b)**2)/(sigma0) *(1/const.c**3)).to(u.GeV**(5/2))
+    return (T_b-T_chi)*(T_chi/m_chi + T_b/m_b)**(1/2) * T_b**(3/2) - other_c
     
 
 class Cluster:
@@ -176,5 +204,8 @@ class Cluster:
         return T_b
 
     def pred_T_b(self, p0): #p0 is a vector with p0[0] = log(sigma0) and p0[1]=log(m_chi)
-        x0 = 1e-6 * u.GeV # starting estimate (could even do this using T_b_small)
-        return fsolve(func, x0, args=(p0, self))*u.GeV
+        x0 = 1e-5 * u.GeV # starting estimate (could even do this using T_b_small)
+        solution=root(fun, x0, args=(self, p0)).x
+        return solution
+
+
