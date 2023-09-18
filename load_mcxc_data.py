@@ -5,8 +5,9 @@ from astropy import units as u
 from cluster import Cluster
 
 def load_clusters(nrows=None):
-    mcxccls=pd.read_csv('data/mcxc|.txt', header=3, sep='|', skiprows=[4],on_bad_lines='warn', skipfooter=1, nrows=nrows)
-
+    skipfooter=0 if nrows else 1
+    mcxccls=pd.read_csv('data/mcxc|.txt', header=3, sep='|', skiprows=[4],on_bad_lines='warn', skipfooter=skipfooter, nrows=nrows)
+    mcxccls.columns=mcxccls.columns.str.strip()
     cls_data={'M500':mcxccls['M500'],
           'L500':mcxccls['L500'],
           'R500':mcxccls['R500']
