@@ -14,7 +14,10 @@ def temp_from_vdisp(vel_disp):
     return (vel_disp ** 2 * const.m_p / const.k_B).to(u.GeV, equivalencies=u.temperature_energy())
 
 def temp_from_luminosity(luminosity):
-    return    
+    lum=luminosity.to(u.erg/u.s)
+    log_T = (np.log10(lum.value)-45.06)/2.88 + np.log10(6)
+    T=np.power(10, log_T) * u.keV
+    return T.to(u.GeV) 
 
 def func(T_b, p0, cluster, n=0):
     #function used to solve for T_b (wrong)
@@ -63,8 +66,10 @@ class Cluster:
             self.rho_dm = self.rho_tot * fdm  # DM density
             if vel_disp:
                 self.baryon_temp = temp_from_vdisp(vel_disp)  # baryon temperature
-            elif L500:
+            elif L500.value:
                 self.baryon_temp = temp_from_luminosity(L500)
+            else:
+                raise ValueError('Must provide a velocity dispersion or luminosity')
 
             # AGN heating params
             self.m500 = m500
