@@ -206,6 +206,6 @@ class Cluster:
     def pred_T_b(self, p0): #p0 is a vector with p0[0] = log(sigma0) and p0[1]=log(m_chi)
         x0 = 1e-5 * u.GeV # starting estimate (could even do this using T_b_small)
         solution=root(fun, x0, args=(self, p0)).x
-        return solution
+        return solution[0]*u.GeV
 
 
