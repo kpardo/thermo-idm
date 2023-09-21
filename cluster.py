@@ -22,8 +22,10 @@ def temp_from_luminosity(luminosity):
 def fun(T_b, cluster, p0, f_chi=1, n=0):
     T_b=T_b*u.GeV
 
-    sigma0=np.float_power(10, p0[0].astype(dtype=np.float128))*u.cm**2
-    m_chi = np.float_power(10, p0[1].astype(dtype=np.float128))*u.GeV
+    #sigma0=np.float_power(10, p0[0].astype(dtype=np.float128))*u.cm**2
+    sigma0=10**p0[0]*u.cm**2
+    #m_chi = np.float_power(10, p0[1].astype(dtype=np.float128))*u.GeV
+    m_chi=10**p0[1]*u.GeV
 
     norm=cluster.norm
     bh_mass=cluster.bh_mass()

@@ -18,6 +18,8 @@ def chi_squared(T_model, T_data, variance): # take lists of model prediction, da
 def log_likelihood_1(p0, T_data, var, clusters, m_chi):
     #if p0[0]<0 or p0[1]<0:
     #   return -np.inf
+    if p0[0]>0:
+        return -np.inf
     T_model = [c.pred_T_b(p0, m_chi) for c in clusters]
     X2 = chi_squared(T_model, T_data, var)
     return (-X2/2)
@@ -25,6 +27,9 @@ def log_likelihood_1(p0, T_data, var, clusters, m_chi):
 def log_likelihood(p0, T_data, var, clusters):
     #if p0[0]<0 or p0[1]<0:
     #   return -np.inf
+    if p0[0]>0 or p0[1]>0:
+        return -np.inf
+    print(p0)
     T_model = [c.pred_T_b(p0) for c in clusters]
     X2 = chi_squared(T_model, T_data, var)
     return (-X2/2)
