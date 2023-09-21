@@ -22,8 +22,8 @@ def temp_from_luminosity(luminosity):
 def fun(T_b, cluster, p0, f_chi=1, n=0):
     T_b=T_b*u.GeV
 
-    sigma0=np.float_power(10, p0[0])*u.cm**2
-    m_chi = np.float_power(10, p0[1])*u.GeV
+    sigma0=np.float_power(10, p0[0].astype(dtype=np.float128))*u.cm**2
+    m_chi = np.float_power(10, p0[1].astype(dtype=np.float128))*u.GeV
 
     norm=cluster.norm
     bh_mass=cluster.bh_mass()
@@ -193,7 +193,7 @@ class Cluster:
         solution=root(fun, x0, args=(self, p0)).x
         return solution[0]*u.GeV
 
-    def pred_T_b(self, p0, m_chi): #p0 is a vector with p0[0] = log(sigma0), m_chi is log(m_chi)
+    def pred_T_b_1(self, p0, m_chi): #p0 is a vector with p0[0] = log(sigma0), m_chi is log(m_chi)
         x0 = 1e-5 * u.GeV # starting estimate (could even do this using T_b_small)
         p0=[p0[0], m_chi]
         solution=root(fun, x0, args=(self, p0)).x
