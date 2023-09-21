@@ -156,11 +156,16 @@ class Cluster:
 
     def sigma0(self, f_chi=1, m_psi=0.1 * u.GeV, n=0):
         with u.set_enabled_equivalencies(u.mass_energy()):
-            dm_temp = self.virial_temperature(self.m_chi, f_chi=f_chi, m_psi=m_psi)
-            uth = np.sqrt(self.baryon_temp / self.m_b + dm_temp / self.m_chi)
+            #m_chis = self.m_chi
+
+            #dm_temp = self.virial_temperature(self.m_chi, f_chi=f_chi, m_psi=m_psi)
+            valid_m_chis = self.m_chi[np.where(self.virial_temperature(self.m_chi, f_chi=f_chi, m_psi=m_psi) < self.baryon_temp)]
+
+            dm_temp = self.virial_temperature(valid_m_chis, f_chi=f_chi, m_psi=m_psi)
+            uth = np.sqrt(self.baryon_temp / self.m_b + dm_temp / valid_m_chis)
             rho_chi = self.rho_dm * f_chi
             total_heating_rate = self.agn_heating_rate() - self.radiative_cooling_rate()
-            numerator = total_heating_rate * (self.m_chi + self.m_b) ** 2
+            numerator = total_heating_rate * (valid_m_chis + self.m_b) ** 2
             denominator = 3 * (self.baryon_temp - dm_temp) * rho_chi * self.rho_b * self.volume * c(n) * uth ** (n + 1) * const.c.to(u.cm / u.s)
             sigma0 = (numerator / denominator).to(u.cm ** 2)
             return sigma0
@@ -172,22 +177,24 @@ class Cluster:
         plt.ylabel(r'$T_{\chi} (GeV)$')
         plt.legend(loc='upper left')
 
-    def plot_sigma0_vs_m_chi(self, f_chi=[1], m_psi=[0.1 * u.GeV], n=[0], region=False): 
+    def plot_sigma0_vs_m_chi(self, f_chi=[1], m_psi=[0.1 * u.GeV], n=[0], region=False, **kwargs): 
         # plots sigma0 vs m_chi for all combinations of f_chi, m_psi, and n
         params = [(f, m, i) for f in f_chi for m in m_psi for i in n]
         for (f, m, i) in params:
             sigma0 = self.sigma0(f_chi=f, m_psi=m, n=i)
-            label = f'fx={f}, n={i}' 
-            label = label + f', m_psi={m}' if f<1 else label
-            plt.loglog(self.m_chi, sigma0,
+            label = f'$f_{{\chi}}={f}$, $n={i}$' 
+            label = label + f', $m_{{\psi}}={m}$' if f<1 else label
+            plt.loglog(self.m_chi[:sigma0.shape[0]], sigma0,
                        label=label)
             if region:
-                plt.fill_between(self.m_chi.value, sigma0.value, y2=1e-15, alpha=0.3)
+                plt.fill_between(self.m_chi[:sigma0.shape[0]].value, sigma0.value, y2=1e-10, alpha=0.3)
 
+        plt.xticks(**kwargs)
+        plt.yticks(**kwargs)
 
-        plt.xlabel(r'$m_{\chi} (GeV)$')
-        plt.ylabel(r'$\sigma_0 (cm^2)$')
-        plt.legend(loc='upper left')
+        plt.xlabel(r'$m_{\chi} (GeV)$', **kwargs)
+        plt.ylabel(r'$\sigma_0 (cm^2)$', **kwargs)
+        plt.legend(loc='upper left', **kwargs)
 
 #model testing methods:
     def pred_T_b_small_m(self, p0, m_chi, n=0):
