@@ -19,28 +19,6 @@ def temp_from_luminosity(luminosity):
     T=np.power(10, log_T) * u.keV
     return T.to(u.GeV) 
 
-# def func(T_b, p0, cluster, n=0):
-#     #function used to solve for T_b (wrong)
-#     sigma0 = p0[0]*u.cm**2
-#     m_chi=p0[1]*u.GeV
-#     T_b = T_b*u.GeV
-
-#     leading_factors = (cluster.norm * 4*np.pi *const.c ** -3).to(u.s**3/u.cm**3)
-    
-#     V=cluster.volume.to(u.cm**3)
-#     x = (3*const.c*c(n)*V*cluster.rho_dm*cluster.rho_b*sigma0/(cluster.m_b+m_chi)**2).to(1/u.s)
-#     gm2 = ((const.G * cluster.bh_mass()) ** 2).to(u.cm**6/u.s**4)
-#     frac = ((cluster.mu * cluster.m_b) ** (5 / 2) / cluster.adiabatic_idx ** (3 / 2)).to(u.GeV**(5/2))
-#     nb = (2 * cluster.n_e).to(u.cm ** (-3)) # baryon number density
-#     D = (cluster.epsilon*leading_factors*gm2*frac*(1/nb**(2/3))**(-3/2)) # removed k_B from original function because we are working in GeV here
-#     T_chi = cluster.virial_temperature(m_chi)
-    
-#     numerator = D*T_b**(-3/2)
-#     denominator = (T_b - T_chi)*(T_chi/m_chi + T_b/cluster.m_b)**(1/2)
-    
-#     return ((numerator/denominator - x)*const.hbar).to(u.GeV, equivalencies=u.temperature_energy())
-
-
 def fun(T_b, cluster, p0, f_chi=1, n=0):
     T_b=T_b*u.GeV
 
@@ -92,7 +70,7 @@ class Cluster:
             self.rho_tot = (self.mass / self.volume).to(u.GeV / u.cm ** 3)  # total density
             self.rho_b = self.rho_tot * fb  # baryon density
             self.rho_dm = self.rho_tot * fdm  # DM density
-            if vel_disp:
+            if vel_disp.value:
                 self.baryon_temp = temp_from_vdisp(vel_disp)  # baryon temperature
             elif L500.value:
                 self.baryon_temp = temp_from_luminosity(L500)
@@ -215,4 +193,9 @@ class Cluster:
         solution=root(fun, x0, args=(self, p0)).x
         return solution[0]*u.GeV
 
+    def pred_T_b(self, p0, m_chi): #p0 is a vector with p0[0] = log(sigma0), m_chi is log(m_chi)
+        x0 = 1e-5 * u.GeV # starting estimate (could even do this using T_b_small)
+        p0=[p0[0], m_chi]
+        solution=root(fun, x0, args=(self, p0)).x
+        return solution[0]*u.GeV
 
