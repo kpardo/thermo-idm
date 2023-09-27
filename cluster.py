@@ -72,8 +72,9 @@ class Cluster:
             self.rho_tot = (self.mass / self.volume).to(u.GeV / u.cm ** 3)  # total density
             self.rho_b = self.rho_tot * fb  # baryon density
             self.rho_dm = self.rho_tot * fdm  # DM density
-            if vel_disp.value:
-                self.baryon_temp = temp_from_vdisp(vel_disp)  # baryon temperature
+            if vel_disp is not None:
+                if vel_disp.value:
+                    self.baryon_temp = temp_from_vdisp(vel_disp)  # baryon temperature
             elif L500.value:
                 self.baryon_temp = temp_from_luminosity(L500)
             else:
