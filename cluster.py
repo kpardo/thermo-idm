@@ -5,6 +5,9 @@ from astropy import constants as const
 from scipy.special import gamma
 from scipy.optimize import root
 from plotting import savefig, paper_plot
+from dataclasses import dataclass
+
+u.set_enabled_equivalencies(u.mass_energy())
 
 
 def c(n):
@@ -60,58 +63,55 @@ def fun(T_b, cluster, p0, f_chi=1, n=0):
     ) - other_c
 
 
+with u.set_enabled_equivalencies(u.mass_energy()):
+    adiabatic_idx = 5 / 3
+    norm = (
+        1 / 4
+    )  # accretion rate normalization factor of order 1, norm(adiabatic_idx=5/3)=1/4
+    mu = 1  # mean molecular weight of gas, 1 for proton gas (hydrogen)
+
+
+@dataclass
 class Cluster:
-    with u.set_enabled_equivalencies(u.mass_energy()):
-        m_b = const.m_p.to(u.GeV)  # baryon particle mass
-        m_chi = np.logspace(-5, 3, num=100) * u.GeV
-        adiabatic_idx = 5 / 3
-        norm = (
-            1 / 4
-        )  # accretion rate normalization factor of order 1, norm(adiabatic_idx=5/3)=1/4
-        mu = 1  # mean molecular weight of gas, 1 for proton gas (hydrogen)
+    radius: float = 1 * u.Mpc
+    mass: float = 1.0e14 * u.Msun
+    vel_disp: float = None
+    L500: float = None
+    epsilon: float = 0.01
+    fb: float = 0.1
+    fdm: float = 0.9
+    m500: float = None
+    v500: float = 0.0 * u.km / u.s
+    m_chi: np.ndarray = np.logspace(-5, 3, num=100) * u.GeV
+    m_b: float = const.m_p.to(u.GeV)  # baryon particle mass
+    adiabatic_idx: float = 5.0 / 3.0
+    norm: float = (
+        1.0 / 4
+    )  # accretion rate normalization factor of order 1, norm(adiabatic_idx=5/3)=1/4
+    mu: float = 1.0  # mean molecular weight of gas, 1 for proton gas (hydrogen)
+    bh_mass: float = None
 
-    def __init__(
-        self,
-        radius,
-        mass,
-        vel_disp=None,
-        L500=None,
-        epsilon=0.01,
-        fb=0.1,
-        fdm=0.9,
-        m500=None,
-        v500=0 * u.km / u.s,
-    ):
-        with u.set_enabled_equivalencies(u.mass_energy()):
-            # General - read from data
-            self.radius = radius  # radius
-            self.mass = mass.to(u.GeV)  # total mass
-            # self.vel_disp = vel_disp  # velocity dispersion
+    def __post_init__(self):
+        # General - read from data
+        self.mass = self.mass.to(u.GeV)  # total mass
+        self.volume = 4 / 3 * np.pi * self.radius**3  # cluster volume
+        self.rho_tot = (self.mass / self.volume).to(u.GeV / u.cm**3)  # total density
+        self.rho_b = self.rho_tot * self.fb  # baryon density
+        self.rho_dm = self.rho_tot * self.fdm  # DM density
+        if self.vel_disp is not None:
+            if self.vel_disp.value:
+                self.baryon_temp = temp_from_vdisp(self.vel_disp)  # baryon temperature
+        elif self.L500.value:
+            self.baryon_temp = temp_from_luminosity(self.L500)
+        else:
+            raise ValueError("Must provide a velocity dispersion or luminosity")
 
-            # General - calculated
-            self.volume = 4 / 3 * np.pi * self.radius**3  # cluster volume
-            self.rho_tot = (self.mass / self.volume).to(
-                u.GeV / u.cm**3
-            )  # total density
-            self.rho_b = self.rho_tot * fb  # baryon density
-            self.rho_dm = self.rho_tot * fdm  # DM density
-            if vel_disp is not None:
-                if vel_disp.value:
-                    self.baryon_temp = temp_from_vdisp(vel_disp)  # baryon temperature
-            elif L500.value:
-                self.baryon_temp = temp_from_luminosity(L500)
-            else:
-                raise ValueError("Must provide a velocity dispersion or luminosity")
+        # radiative cooling params
+        self.n_e = self.rho_b / self.m_b  # number density of electrons
 
-            # AGN heating params
-            self.m500 = m500
-            self.epsilon = epsilon  # efficiency
-
-            # radiative cooling params
-            self.n_e = self.rho_b / self.m_b  # number density of electrons
-
-            # to calculate luminosity
-            self.v500 = v500  # default 0 gives no cooling
+        # setup AGN heating
+        if self.bh_mass is None:
+            self.bh_mass = self.get_bh_mass()
 
     def agn_heating_rate(self):
         with u.set_enabled_equivalencies(u.mass_energy()):
@@ -122,11 +122,11 @@ class Cluster:
     def accretion_rate(self):
         with u.set_enabled_equivalencies(u.mass_energy()):
             leading_factors = self.norm * 4 * np.pi * const.c**-3
-            gm2 = (const.G * self.bh_mass()) ** 2
+            gm2 = (const.G * self.bh_mass) ** 2
             frac = (self.mu * self.m_b) ** (5 / 2) / self.adiabatic_idx ** (3 / 2)
             return leading_factors * gm2 * frac * self.plasma_entropy() ** (-3 / 2)
 
-    def bh_mass(self):  # from Gaspari 2019 figure 8
+    def get_bh_mass(self):  # from Gaspari 2019 figure 8
         slope = 1.39
         intercept = -9.56 * u.Msun
         return (slope * self.m500 + intercept).to(u.kg)
@@ -168,34 +168,33 @@ class Cluster:
         )
 
     def sigma0(self, f_chi=1, m_psi=0.1 * u.GeV, n=0):
-        with u.set_enabled_equivalencies(u.mass_energy()):
-            # m_chis = self.m_chi
+        # m_chis = self.m_chi
 
-            # dm_temp = self.virial_temperature(self.m_chi, f_chi=f_chi, m_psi=m_psi)
-            valid_m_chis = self.m_chi[
-                np.where(
-                    self.virial_temperature(self.m_chi, f_chi=f_chi, m_psi=m_psi)
-                    < self.baryon_temp
-                )
-            ]
-
-            dm_temp = self.virial_temperature(valid_m_chis, f_chi=f_chi, m_psi=m_psi)
-            uth = np.sqrt(self.baryon_temp / self.m_b + dm_temp / valid_m_chis)
-            rho_chi = self.rho_dm * f_chi
-            total_heating_rate = self.agn_heating_rate() - self.radiative_cooling_rate()
-            numerator = total_heating_rate * (valid_m_chis + self.m_b) ** 2
-            denominator = (
-                3
-                * (self.baryon_temp - dm_temp)
-                * rho_chi
-                * self.rho_b
-                * self.volume
-                * c(n)
-                * uth ** (n + 1)
-                * const.c.to(u.cm / u.s)
+        # dm_temp = self.virial_temperature(self.m_chi, f_chi=f_chi, m_psi=m_psi)
+        valid_m_chis = self.m_chi[
+            np.where(
+                self.virial_temperature(self.m_chi, f_chi=f_chi, m_psi=m_psi)
+                < self.baryon_temp
             )
-            sigma0 = (numerator / denominator).to(u.cm**2)
-            return sigma0
+        ]
+
+        dm_temp = self.virial_temperature(valid_m_chis, f_chi=f_chi, m_psi=m_psi)
+        uth = np.sqrt(self.baryon_temp / self.m_b + dm_temp / valid_m_chis)
+        rho_chi = self.rho_dm * f_chi
+        total_heating_rate = self.agn_heating_rate() - self.radiative_cooling_rate()
+        numerator = total_heating_rate * (valid_m_chis + self.m_b) ** 2
+        denominator = (
+            3
+            * (self.baryon_temp - dm_temp)
+            * rho_chi
+            * self.rho_b
+            * self.volume
+            * c(n)
+            * uth ** (n + 1)
+            * const.c.to(u.cm / u.s)
+        )
+        sigma0 = (numerator / denominator).to(u.cm**2)
+        return sigma0
 
     def plot_T_chi_vs_m_chi(
         self, f_chi=1, m_psi=0.1 * u.GeV
@@ -214,7 +213,7 @@ class Cluster:
     ):
         # plots sigma0 vs m_chi for all combinations of f_chi, m_psi, and n
         paper_plot()
-        f = plt.figure()
+        fig = plt.figure()
         params = [(f, m, i) for f in f_chi for m in m_psi for i in n]
         for f, m, i in params:
             sigma0 = self.sigma0(f_chi=f, m_psi=m, n=i)
@@ -232,10 +231,10 @@ class Cluster:
         plt.xticks(**kwargs)
         plt.yticks(**kwargs)
 
-        plt.xlabel(r"$m_{\chi} (GeV)$", **kwargs)
-        plt.ylabel(r"$\sigma_0 (cm^2)$", **kwargs)
+        plt.xlabel(r"$m_{\chi} \mathrm{(GeV)}$", **kwargs)
+        plt.ylabel(r"$\sigma_0 (\mathrm{cm}^2)$", **kwargs)
         plt.legend(loc="upper left", **kwargs)
-        f.savefig("plots/sigma0_mchi.pdf")
+        savefig(fig, "plots/sigma0_mchi.pdf")
 
     # model testing methods:
     def pred_T_b_small_m(self, p0, m_chi, n=0):
