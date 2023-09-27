@@ -209,7 +209,7 @@ class Cluster:
         plt.legend(loc="upper left")
 
     def plot_sigma0_vs_m_chi(
-        self, f_chi=[1], m_psi=[0.1 * u.GeV], n=[0], region=False, **kwargs
+        self, f_chi=[1], m_psi=[0.1 * u.GeV], n=[0], region=False, save=False, **kwargs
     ):
         # plots sigma0 vs m_chi for all combinations of f_chi, m_psi, and n
         paper_plot()
@@ -230,11 +230,13 @@ class Cluster:
 
         plt.xticks(**kwargs)
         plt.yticks(**kwargs)
+        plt.ylim([10 ** (np.log10(np.nanmin(sigma0.value)) - 2), 1.0e-26])
 
         plt.xlabel(r"$m_{\chi} \mathrm{(GeV)}$", **kwargs)
         plt.ylabel(r"$\sigma_0 (\mathrm{cm}^2)$", **kwargs)
         plt.legend(loc="upper left", **kwargs)
-        savefig(fig, "plots/sigma0_mchi.pdf")
+        if save:
+            savefig(fig, "plots/sigma0_mchi.pdf")
 
     # model testing methods:
     def pred_T_b_small_m(self, p0, m_chi, n=0):
